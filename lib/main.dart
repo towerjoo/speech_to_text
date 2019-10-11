@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:speech_to_text/src/speech_to_text.dart';
+import 'package:speech_to_text_google/src/speech_to_text.dart';
 
 void main() => runApp(MyApp());
 

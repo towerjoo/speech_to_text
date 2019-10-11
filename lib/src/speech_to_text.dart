@@ -1,5 +1,6 @@
-import 'package:speech_to_text/src/generated/google/cloud/speech/v1/cloud_speech.pbgrpc.dart';
 import 'package:grpc/grpc.dart';
+
+import 'generated/google/cloud/speech/v1/cloud_speech.pbgrpc.dart';
 
 class SpeechToText {
   String credentials;
