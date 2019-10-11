@@ -2,6 +2,7 @@ name: speech_to_text
 description: Speech To Text Using Google Cloud Service.
 authors:
   - Tao Zhu <tao@zeno.group>
+homepage: https://github.com/towerjoo/speech_to_text
 
 
 # The following defines the version and build number for your application.
