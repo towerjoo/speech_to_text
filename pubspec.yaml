@@ -1,4 +1,4 @@
-name: speech_to_text
+name: speech_to_text_google
 description: Speech To Text Using Google Cloud Service.
 authors:
   - Tao Zhu <tao@zeno.group>
