@@ -1,14 +1,70 @@
 import 'package:grpc/grpc.dart';
-
+import 'package:googleapis_auth/auth.dart' show AccessToken;
 import 'generated/google/cloud/speech/v1/cloud_speech.pbgrpc.dart';
+
+class SpeechToTextAuthenticator extends BaseAuthenticator {
+  AccessToken _accessToken;
+  Future<Map> Function() _fetchToken;
+  static int tryTimes = 0;
+  SpeechToTextAuthenticator(Future<Map> Function() fetchToken) {
+    // Map token = {
+    //   "token":
+    //       "ya29.c.Kl6wB7DgqIMjOqylrPDX1dC7P-Xnrqm8AFDmglESLghkM1rL8TycgFPGHXan1H45lUJrvN8_xrkD_qK8t_EoPVQCvzpuFiqqL_5VGpPJL-hk8G9Gg9NepwjgDfie9e2X",
+    //   "expiry": "2019-11-06 09:52:06.369570"
+    // };
+    _fetchToken = fetchToken;
+  }
+  Future<void> authenticate(Map<String, String> metadata, String uri) async {
+    Map token = await _fetchToken();
+    DateTime expiry = DateTime.parse(token["expiry"]).toUtc();
+    _accessToken = AccessToken("Bearer", token["token"], expiry);
+    final auth = '${_accessToken.type} ${_accessToken.data}';
+    metadata['authorization'] = auth;
+    if (_tokenExpiresSoon) {
+      // Token is about to expire. Extend it prematurely.
+      if (tryTimes >= 3) {
+        // avoid the dead lock
+        return;
+      }
+      tryTimes++;
+      await authenticate(metadata, uri);
+      // obtainAccessCredentials(_lastUri).catchError((_) {});
+    }
+  }
+
+  bool get _tokenExpiresSoon => _accessToken.expiry
+      .subtract(Duration(seconds: 30))
+      .isBefore(DateTime.now().toUtc());
+
+  Future<void> obtainAccessCredentials(String uri) async {
+    return null;
+  }
+}
 
 class SpeechToText {
   String credentials;
-  SpeechToText({this.credentials});
+  String authType;
+  Future<Map> Function() fetchToken;
+  SpeechToText({this.credentials}) {
+    this.authType = "account";
+  }
+  SpeechToText.initWithAccount({String credentials}) {
+    this.authType = "account";
+    this.credentials = credentials;
+  }
+  SpeechToText.initWithToken({Future<Map> Function() fetchToken}) {
+    this.authType = "token";
+    this.fetchToken = fetchToken;
+  }
   Stream<Map> convert(Stream<List<int>> audioStream,
       {int sampleRate = 16000, langCode = 'en-US'}) async* {
     var scopes = ["https://www.googleapis.com/auth/cloud-platform"];
-    final authenticator = ServiceAccountAuthenticator(credentials, scopes);
+    var authenticator;
+    if (authType == "account") {
+      authenticator = ServiceAccountAuthenticator(credentials, scopes);
+    } else {
+      authenticator = SpeechToTextAuthenticator(fetchToken);
+    }
     ClientChannel channel = ClientChannel('speech.googleapis.com');
 
     SpeechClient speechClient =
