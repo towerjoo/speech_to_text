@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:grpc/grpc.dart';
 import 'package:googleapis_auth/auth.dart' show AccessToken;
 import 'generated/google/cloud/speech/v1/cloud_speech.pbgrpc.dart';
@@ -42,9 +44,18 @@ class SpeechToTextAuthenticator extends BaseAuthenticator {
 }
 
 class SpeechToText {
+  static const int STREAM_LIMIT = 29000; // in ms, 30s at most
   String credentials;
   String authType;
   Future<Map> Function() fetchToken;
+
+  DateTime startTime;
+
+  bool isClosed = false;
+
+  bool isInitial = true;
+  int pendingSessions = 0;
+
   SpeechToText({this.credentials}) {
     this.authType = "account";
   }
@@ -69,24 +80,82 @@ class SpeechToText {
 
     SpeechClient speechClient =
         SpeechClient(channel = channel, options: authenticator.toCallOptions);
+    StreamController<StreamingRecognizeRequest> requestController =
+        StreamController();
+    Stream<StreamingRecognizeResponse> responseStream;
 
-    var requestStream = getStreamingRequest(audioStream, sampleRate, langCode)
-        .asBroadcastStream();
-    await for (var resp in speechClient.streamingRecognize(requestStream)) {
-      int numCharsPrinted = 0;
-      String overwriteChars = "";
-      if (resp.results.length > 0) {
-        var result = resp.results[0];
-        if (result.alternatives.length > 0) {
-          var transcript = result.alternatives[0].transcript;
-          overwriteChars = ' ' * (numCharsPrinted - transcript.length);
-          yield {
-            'transcript': transcript + overwriteChars,
-            'isFinal': result.isFinal
-          };
+    startTime = DateTime.now();
+    audioStream.listen((audio) {
+      print("audio stream: ${audio.length}");
+      if (isInitial ||
+          DateTime.now().difference(startTime).inMilliseconds >= STREAM_LIMIT) {
+        if (!isInitial) {
+          requestController.close();
+          requestController = StreamController();
+          print("created a new session");
+        }
+        isInitial = false;
+        startTime = DateTime.now();
+        requestController.add(getRequestConfig(sampleRate, langCode));
+        pendingSessions += 1;
+        print("pending sessions after adding: $pendingSessions");
+      }
+      requestController.add(getRequestData(audio));
+    }, onDone: () {
+      print("audio is closed");
+      isClosed = true;
+      requestController.close();
+    });
+    int session = 0;
+    while (true) {
+      session += 1;
+      print("current session: $session");
+      responseStream =
+          speechClient.streamingRecognize(requestController.stream);
+      await for (var resp in responseStream) {
+        int numCharsPrinted = 0;
+        String overwriteChars = "";
+        if (resp.results.length > 0) {
+          var result = resp.results[0];
+          if (result.alternatives.length > 0) {
+            var transcript = result.alternatives[0].transcript;
+            overwriteChars = ' ' * (numCharsPrinted - transcript.length);
+            yield {
+              'transcript': transcript + overwriteChars,
+              'isFinal': result.isFinal
+            };
+          }
         }
       }
+      pendingSessions--;
+      print("pending sessions after substracting: $pendingSessions");
+      if (pendingSessions == 0) {
+        print("there's no pending sessions now, clean up");
+        // requestController.close();
+        break;
+      }
     }
+  }
+
+  StreamingRecognizeRequest getRequestConfig(int sampleRate, String langCode) {
+    RecognitionConfig config = RecognitionConfig();
+    config
+      ..encoding = RecognitionConfig_AudioEncoding.LINEAR16
+      ..sampleRateHertz = sampleRate
+      ..enableAutomaticPunctuation = true
+      ..languageCode = langCode;
+    StreamingRecognitionConfig streamingRecognitionConfig =
+        StreamingRecognitionConfig();
+    streamingRecognitionConfig.config = config;
+    streamingRecognitionConfig.interimResults = true;
+    var req = StreamingRecognizeRequest()
+      ..streamingConfig = streamingRecognitionConfig;
+    return req;
+  }
+
+  StreamingRecognizeRequest getRequestData(List<int> audio) {
+    var req = StreamingRecognizeRequest()..audioContent = audio;
+    return req;
   }
 
   Stream<List<int>> patchStream(
