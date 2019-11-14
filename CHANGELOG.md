@@ -1,3 +1,6 @@
+## 1.2.2
+now support useEnhanced argument.
+
 ## 1.2.1
 now support modelType argument.
 

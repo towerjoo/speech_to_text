@@ -94,7 +94,8 @@ class SpeechToText {
   Stream<Map> convert(Stream<List<int>> audioStream,
       {int sampleRate = 16000,
       String langCode = 'en-US',
-      MODEL_TYPE modelType = MODEL_TYPE.DEFAULT}) async* {
+      MODEL_TYPE modelType = MODEL_TYPE.DEFAULT,
+      useEnhanced = false}) async* {
     var scopes = ["https://www.googleapis.com/auth/cloud-platform"];
     var authenticator;
     if (authType == "account") {
@@ -122,8 +123,8 @@ class SpeechToText {
         }
         isInitial = false;
         startTime = DateTime.now();
-        requestController
-            .add(getRequestConfig(sampleRate, langCode, modelType));
+        requestController.add(
+            getRequestConfig(sampleRate, langCode, modelType, useEnhanced));
         pendingSessions += 1;
         print("pending sessions after adding: $pendingSessions");
       }
@@ -165,13 +166,14 @@ class SpeechToText {
   }
 
   StreamingRecognizeRequest getRequestConfig(
-      int sampleRate, String langCode, MODEL_TYPE modelType) {
+      int sampleRate, String langCode, MODEL_TYPE modelType, bool useEnhanced) {
     RecognitionConfig config = RecognitionConfig();
     config
       ..encoding = RecognitionConfig_AudioEncoding.LINEAR16
       ..sampleRateHertz = sampleRate
       ..enableAutomaticPunctuation = true
       ..model = getModelName(modelType)
+      ..useEnhanced = useEnhanced
       ..languageCode = langCode;
     StreamingRecognitionConfig streamingRecognitionConfig =
         StreamingRecognitionConfig();
