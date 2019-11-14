@@ -62,8 +62,8 @@ class _MyHomePageState extends State<MyHomePage> {
     await File(path).writeAsBytes(
         data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes));
     Stream<List<int>> audioStream = File(path).openRead();
-    await for (var resp
-        in speechToText.convert(audioStream, sampleRate: 8000)) {
+    await for (var resp in speechToText.convert(audioStream,
+        sampleRate: 8000, modelType: MODEL_TYPE.DEFAULT)) {
       setState(() {
         if (resp["isFinal"]) {
           content += resp["transcript"];

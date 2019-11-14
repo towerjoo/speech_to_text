@@ -1,3 +1,6 @@
+## 1.2.1
+now support modelType argument.
+
 ## 1.2.0
 now support infinite streaming.
 

@@ -4,6 +4,30 @@ import 'package:grpc/grpc.dart';
 import 'package:googleapis_auth/auth.dart' show AccessToken;
 import 'generated/google/cloud/speech/v1/cloud_speech.pbgrpc.dart';
 
+enum MODEL_TYPE { DEFAULT, PHONE_CALL, VIDEO, COMMAND_AND_SEARCH }
+
+String getModelName(MODEL_TYPE model) {
+  String modelName = "default";
+  switch (model) {
+    case MODEL_TYPE.PHONE_CALL:
+      modelName = "phone_call";
+      break;
+    case MODEL_TYPE.COMMAND_AND_SEARCH:
+      modelName = "command_and_search";
+      break;
+    case MODEL_TYPE.VIDEO:
+      modelName = "video";
+      break;
+    case MODEL_TYPE.DEFAULT:
+      modelName = "default";
+      break;
+    default:
+      modelName = "default";
+      break;
+  }
+  return modelName;
+}
+
 class SpeechToTextAuthenticator extends BaseAuthenticator {
   AccessToken _accessToken;
   Future<Map> Function() _fetchToken;
@@ -68,7 +92,9 @@ class SpeechToText {
     this.fetchToken = fetchToken;
   }
   Stream<Map> convert(Stream<List<int>> audioStream,
-      {int sampleRate = 16000, langCode = 'en-US'}) async* {
+      {int sampleRate = 16000,
+      String langCode = 'en-US',
+      MODEL_TYPE modelType = MODEL_TYPE.DEFAULT}) async* {
     var scopes = ["https://www.googleapis.com/auth/cloud-platform"];
     var authenticator;
     if (authType == "account") {
@@ -96,7 +122,8 @@ class SpeechToText {
         }
         isInitial = false;
         startTime = DateTime.now();
-        requestController.add(getRequestConfig(sampleRate, langCode));
+        requestController
+            .add(getRequestConfig(sampleRate, langCode, modelType));
         pendingSessions += 1;
         print("pending sessions after adding: $pendingSessions");
       }
@@ -137,12 +164,14 @@ class SpeechToText {
     }
   }
 
-  StreamingRecognizeRequest getRequestConfig(int sampleRate, String langCode) {
+  StreamingRecognizeRequest getRequestConfig(
+      int sampleRate, String langCode, MODEL_TYPE modelType) {
     RecognitionConfig config = RecognitionConfig();
     config
       ..encoding = RecognitionConfig_AudioEncoding.LINEAR16
       ..sampleRateHertz = sampleRate
       ..enableAutomaticPunctuation = true
+      ..model = getModelName(modelType)
       ..languageCode = langCode;
     StreamingRecognitionConfig streamingRecognitionConfig =
         StreamingRecognitionConfig();
