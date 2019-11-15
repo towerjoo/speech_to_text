@@ -1,3 +1,6 @@
+## 1.2.3
+remove the assets directive.
+
 ## 1.2.2
 now support useEnhanced argument.
 
