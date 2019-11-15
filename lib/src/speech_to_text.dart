@@ -32,6 +32,8 @@ class SpeechToTextAuthenticator extends BaseAuthenticator {
   AccessToken _accessToken;
   Future<Map> Function() _fetchToken;
   static int tryTimes = 0;
+  Map _token;
+  String type;
   SpeechToTextAuthenticator(Future<Map> Function() fetchToken) {
     // Map token = {
     //   "token":
@@ -39,9 +41,18 @@ class SpeechToTextAuthenticator extends BaseAuthenticator {
     //   "expiry": "2019-11-06 09:52:06.369570"
     // };
     _fetchToken = fetchToken;
+    type = "callback";
+  }
+  SpeechToTextAuthenticator.initWithToken(this._token) {
+    type = "token";
   }
   Future<void> authenticate(Map<String, String> metadata, String uri) async {
-    Map token = await _fetchToken();
+    Map token;
+    if (type == "token") {
+      token = this._token;
+    } else {
+      token = await _fetchToken();
+    }
     DateTime expiry = DateTime.parse(token["expiry"]).toUtc();
     _accessToken = AccessToken("Bearer", token["token"], expiry);
     final auth = '${_accessToken.type} ${_accessToken.data}';
@@ -72,6 +83,7 @@ class SpeechToText {
   String credentials;
   String authType;
   Future<Map> Function() fetchToken;
+  Map fetchedToken;
 
   DateTime startTime;
 
@@ -80,16 +92,26 @@ class SpeechToText {
   bool isInitial = true;
   int pendingSessions = 0;
 
+  @Deprecated(
+      "this function is deprecated, please use initWithFetchedToken instead")
   SpeechToText({this.credentials}) {
     this.authType = "account";
   }
+  @Deprecated(
+      "this function is deprecated, please use initWithFetchedToken instead")
   SpeechToText.initWithAccount({String credentials}) {
     this.authType = "account";
     this.credentials = credentials;
   }
+  @Deprecated(
+      "this function is deprecated, please use initWithFetchedToken instead")
   SpeechToText.initWithToken({Future<Map> Function() fetchToken}) {
     this.authType = "token";
     this.fetchToken = fetchToken;
+  }
+  SpeechToText.initWithFetchedToken({Map fetchedToken}) {
+    this.authType = "fetchedToken";
+    this.fetchedToken = fetchedToken;
   }
   Stream<Map> convert(Stream<List<int>> audioStream,
       {int sampleRate = 16000,
@@ -100,6 +122,9 @@ class SpeechToText {
     var authenticator;
     if (authType == "account") {
       authenticator = ServiceAccountAuthenticator(credentials, scopes);
+    } else if (authType == "fetchedToken") {
+      authenticator =
+          SpeechToTextAuthenticator.initWithToken(this.fetchedToken);
     } else {
       authenticator = SpeechToTextAuthenticator(fetchToken);
     }

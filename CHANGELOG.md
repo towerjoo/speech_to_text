@@ -1,3 +1,6 @@
+## 1.2.4
+support to pass a fetchedToken instead of a callback.
+
 ## 1.2.3
 remove the assets directive.
 
